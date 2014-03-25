@@ -1,4 +1,5 @@
 (function() {
+  // Utility function to collect keys of an object.
   function objectKeys(obj) {
     var keys = [], k;
     for (k in obj) {
@@ -10,6 +11,8 @@
     return keys;
   }
 
+  // Utility function to create a list of dom nodes
+  // in a DOMNodeList object.
   function collectNodes(nodeList) {
     var nodes = [], i;
     for (i = 0; i < nodeList.length; i++) {
@@ -19,6 +22,7 @@
     return nodes;
   }
 
+  // Create a DOMNode with the entire page or with the selected fragment.
   var selection = window.getSelection();
   var range;
   var selectedFragment;
@@ -36,6 +40,9 @@
     container = document.documentElement;
   }
 
+  // Collection of files found in page/selection.
+  var files = {};
+
   var isDownloadable = function(url) {
     if (!url || url.charAt(0) == '#') {
       return false;
@@ -48,6 +55,7 @@
   };
 
   // List of downloadable resources.
+  // This list can be changed to suit custom needs.
   var tags = {
     a: ['href'],
     img: ['src'],
@@ -57,12 +65,19 @@
     object: ['src']
   };
 
+  // List of css properties containing files.
+  var css = {
+    'background-image': {
+      extract: /^url\((.*?)\)$/i
+    }
+  };
+
+  // Find elements with "downloadable attributes" inside the container.
   var selector = objectKeys(tags).join(',');
 
   var els = container.querySelectorAll(selector);
   els = collectNodes(els);
 
-  var assets = {};
   var urlRoot = document.location.protocol + '//' + document.location.hostname;
   var pathComponents = document.location.pathname.split('/');
   pathComponents.shift();
@@ -71,31 +86,52 @@
 
   els.forEach(function(el) {
     var tagName = el.tagName.toLowerCase();
-    if (tagName in tags) {
-      var attrs = tags[tagName];
-      attrs.forEach(function(attr) {
-        var url = el.getAttribute(attr);
-        var hasProtocol;
-        if (isDownloadable(url)) {
-          // Prepend baseUrl to urls without protocol.
-          hasProtocol = /^[^:]+:/.test(url);
-          if (!hasProtocol) {
-            if (url.charAt(0) == '/') {
-              url = urlRoot + url;
-            }
-            else {
-              url = baseUrl + '/' + url;
-            }
+    var attrs = tags[tagName];
+    attrs.forEach(function(attr) {
+      var url = el.getAttribute(attr);
+      var hasProtocol;
+      if (isDownloadable(url)) {
+        // Prepend baseUrl to urls without protocol.
+        hasProtocol = /^[^:]+:/.test(url);
+        if (!hasProtocol) {
+          if (url.charAt(0) == '/') {
+            url = urlRoot + url;
           }
-
-          // Avoid duplicates.
-          assets[url] = url;
+          else {
+            url = baseUrl + '/' + url;
+          }
         }
-      });
-    }
+
+        files[url] = url;
+      }
+    });
   });
 
-  objectKeys(assets).forEach(function(url) {
+  // Second step. Find files inside css in every single node inside the container.
+  var allNodes = container.querySelectorAll('*');
+  allNodes = collectNodes(allNodes);
+
+  allNodes.forEach(function(el) {
+    var computedStyle = window.getComputedStyle(el);
+    objectKeys(css).forEach(function(property) {
+      var value = computedStyle.getPropertyValue(property);
+      var extract, extracted, url;
+      if (value && value != 'none') {
+        extract = css[property].extract;
+        extracted = value.match(extract);
+        console.log(extracted);
+        if (extracted && extracted.length) {
+          url = extracted[1];
+          console.log(extracted);
+          files[url] = url;
+        }
+      }
+    });
+  });
+
+  // To force download of a file, create a dummy link with "download" attribute.
+  // Chrome should ask for multi-download permission, but it's ok.
+  objectKeys(files).forEach(function(url) {
     var dummyLink = document.createElement('a');
     dummyLink.setAttribute('download', '');
     dummyLink.setAttribute('href', url);
