@@ -119,10 +119,8 @@
       if (value && value != 'none') {
         extract = css[property].extract;
         extracted = value.match(extract);
-        console.log(extracted);
         if (extracted && extracted.length) {
           url = extracted[1];
-          console.log(extracted);
           files[url] = url;
         }
       }
