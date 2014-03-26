@@ -11,8 +11,8 @@
       return keys;
     }
 
-    // Utility function to create a list of dom nodes
-    // in a DOMNodeList object.
+    // Utility function to create a list of DOM nodes
+    // in a NodeList object.
     function collectNodes(nodeList) {
       var nodes = [], i;
       for (i = 0; i < nodeList.length; i++) {
@@ -23,7 +23,7 @@
     }
 
     // Configuration.
-    //
+
     // List of downloadable resources.
     // This list can be changed to suit custom needs.
     var tags = {
@@ -49,9 +49,11 @@
         return false;
       }
 
-      var filename = url.split('/').pop();
-      var HAS_EXTENSION = /\.(.*?)$/i;
+      var HOST = /^[^:]+:\/\/[^\/]+/;
+      var QUERYSTRING = /\?.*$/;
+      var HAS_EXTENSION = /\.(.*?)$/;
       var NOT_A_FILE = /\.(htm|html)$/i;
+      var filename = url.replace(HOST, '').replace(QUERYSTRING, '').split('/').pop();
       return HAS_EXTENSION.test(filename) && !NOT_A_FILE.test(filename);
     };
 
@@ -89,6 +91,7 @@
       nodes = collectNodes(nodes);
     }
 
+    var protocol = document.location.protocol;
     var urlRoot = document.location.protocol + '//' + document.location.hostname;
     var pathComponents = document.location.pathname.split('/');
     pathComponents.shift();
@@ -101,23 +104,34 @@
 
       attrs.forEach(function(attr) {
         var url = node.getAttribute(attr);
-        var hasProtocol;
-        if (isDownloadable(url)) {
-          // Prepend baseUrl to urls without protocol.
-          hasProtocol = /^[^:]+:/.test(url);
+        var hasProtocol = /^[^:]+:\/\//.test(url);
+
+        // Filter out insignificant urls.
+        if (url && url.charAt(0) != '#') {
+          // Ensure url is a complete url.
           if (!hasProtocol) {
-            if (url.charAt(0) == '/') {
+            if (url.substr(0, 2) == '//') {
+              // Protocol-relative url.
+              url = protocol + url;
+            }
+            else if (url.charAt(0) == '/') {
+              // Root-relative url.
               url = urlRoot + url;
             }
             else {
+              // Other relative urls.
               url = baseUrl + '/' + url;
             }
           }
 
-          files[url] = url;
+          // Filter out links to pages. We only want files.
+          if (isDownloadable(url)) {
+            files[url] = url;
+          }
         }
       });
 
+      // Process css styles.
       var computedStyle = window.getComputedStyle(node);
       objectKeys(css).forEach(function(property) {
         var value = computedStyle.getPropertyValue(property);
@@ -127,7 +141,11 @@
           extracted = value.match(extract);
           if (extracted && extracted.length) {
             url = extracted[1];
-            files[url] = url;
+
+            // Just to be sure we can download the file.
+            if (isDownloadable(url)) {
+              files[url] = url;
+            }
           }
         }
       });
